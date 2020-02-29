@@ -64,7 +64,7 @@ private:
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
     Tracking* mpTracker;
-
+    
     // 1/fps in ms
     double mT;
     float mImageWidth, mImageHeight;
@@ -80,6 +80,31 @@ private:
     bool mbStopped;
     bool mbStopRequested;
     std::mutex mMutexStop;
+
+  /// 利用Opencv Mat对象中内容来渲染Pangolin
+  static void UploadCvTexture(
+      const cv::Mat &mat,
+      pangolin::GlTexture &texture,
+      bool color,
+      GLenum data_type
+  ) {
+    int old_alignment, old_row_length;
+    glGetIntegerv(GL_UNPACK_ALIGNMENT, &old_alignment);
+    glGetIntegerv(GL_UNPACK_ROW_LENGTH, &old_row_length);
+
+    int new_alignment = (mat.step & 3) ? 1 : 4;
+    int new_row_length = static_cast<int>(mat.step / mat.elemSize());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, new_alignment);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, new_row_length);
+
+    // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
+    // so you get dark, uncolored images.
+    GLenum data_format = (color) ? GL_BGR : GL_LUMINANCE;
+    texture.Upload(mat.data, data_format, data_type);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, old_alignment);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, old_row_length);
+  } 
 
 };
 

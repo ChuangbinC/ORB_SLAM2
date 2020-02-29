@@ -49,6 +49,7 @@ Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer
     mViewpointY = fSettings["Viewer.ViewpointY"];
     mViewpointZ = fSettings["Viewer.ViewpointZ"];
     mViewpointF = fSettings["Viewer.ViewpointF"];
+    // detail_views_ = &(pangolin::Display("detail"));
 }
 
 void Viewer::Run()
@@ -74,6 +75,7 @@ void Viewer::Run()
     pangolin::Var<bool> menuReset("menu.Reset",false,false);
 
     // Define Camera Render Object (for view / scene browsing)
+    // SetBounds(bottom, top, left, right)
     pangolin::OpenGlRenderState s_cam(
                 pangolin::ProjectionMatrix(1024,768,mViewpointF,mViewpointF,512,389,0.1,1000),
                 pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0)
@@ -81,13 +83,25 @@ void Viewer::Run()
 
     // Add named OpenGL viewport to window and provide 3D Handler
     pangolin::View& d_cam = pangolin::CreateDisplay()
-            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f/768.0f)
+            // .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f/768.0f)
+            .SetAspect(-1024.0f/768.0f)
             .SetHandler(new pangolin::Handler3D(s_cam));
+
+    pangolin::View& d_img = pangolin::Display("rgb")
+            .SetAspect(-1024.0f/768.0f);
 
     pangolin::OpenGlMatrix Twc;
     Twc.SetIdentity();
-
-    cv::namedWindow("ORB-SLAM2: Current Frame");
+    // pangolin::View *detail_views_;
+    // detail_views_->SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0);
+    // detail_views_->set
+    pangolin::Display("multi")
+      .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0)
+      .SetLayout(pangolin::LayoutEqual)
+      .AddDisplay(d_cam)
+      .AddDisplay(d_img);
+    pangolin::GlTexture pane_texture_(1024, 384, GL_RGB, false, 0, GL_RGB,GL_UNSIGNED_BYTE);
+    // cv::namedWindow("ORB-SLAM2: Current Frame");
 
     bool bFollow = true;
     bool bLocalizationMode = false;
@@ -132,12 +146,23 @@ void Viewer::Run()
         if(menuShowPoints)
             mpMapDrawer->DrawMapPoints();
 
-        pangolin::FinishFrame();
-
+        
+        // d_img.Activate();
+        // glColor3f(1.0f, 1.0f, 1.0f);
         cv::Mat im = mpFrameDrawer->DrawFrame();
-        cv::imshow("ORB-SLAM2: Current Frame",im);
-        cv::waitKey(mT);
+        // 用自己的办法就需要resize图片大小，不然无法显示
+        cv::resize(im,im,cv::Size(1024,384));
+        // 用DynSLAM的方法也可以
+        // UploadCvTexture(im, pane_texture_, true, GL_UNSIGNED_BYTE);
+        pane_texture_.Upload(im.data,GL_BGR,GL_UNSIGNED_BYTE);
+        d_img.Activate();
+        glColor3f(1.0f, 1.0f, 1.0f);
+	    pane_texture_.RenderToViewport(true);
+        // cv::imshow("ORB-SLAM2: Current Frame",im);
+        // cv::waitKey(mT);
 
+        // 这个表示画图程序的结尾，所以要放在最后
+        pangolin::FinishFrame();
         if(menuReset)
         {
             menuShowGraph = true;
